@@ -1,6 +1,5 @@
 #import "FilePickerManager.h"
 #import "RCTConvert.h"
-#import "DBAttachmentPickerController/DBAttachmentPickerController.h"
 #import <AssetsLibrary/AssetsLibrary.h>
 
 @import MobileCoreServices;
@@ -46,6 +45,12 @@ RCT_EXPORT_METHOD(launchImageLibrary:(NSDictionary *)options callback:(RCTRespon
     [self launchImagePicker:RNImagePickerTargetLibrarySingleImage options:options];
 }
 
+RCT_EXPORT_METHOD(showFilePicker:(NSDictionary *)options callback:(RCTResponseSenderBlock)callback)
+{
+    self.callback = callback;
+    [self launchImagePicker:RNImagePickerTargetLibrarySingleImage options:options];
+}
+
 RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseSenderBlock)callback)
 {
     self.callback = callback; // Save the callback so we can use it from the delegate methods
@@ -53,7 +58,7 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
     for (NSString *key in options.keyEnumerator) { // Replace default options
         [self.options setValue:options[key] forKey:key];
     }
-    
+
     NSString *title = [self.options valueForKey:@"title"];
     if ([title isEqual:[NSNull null]] || title.length == 0) {
         title = nil; // A more visually appealing UIAlertControl is displayed with a nil title rather than title = @""
@@ -64,15 +69,15 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
     }
     NSString *takePhotoButtonTitle = [self.options valueForKey:@"takePhotoButtonTitle"];
     NSString *chooseFromLibraryButtonTitle = [self.options valueForKey:@"chooseFromLibraryButtonTitle"];
-    
+
     if ([UIAlertController class] && [UIAlertAction class]) { // iOS 8+
         self.alertController = [UIAlertController alertControllerWithTitle:title message:nil preferredStyle:UIAlertControllerStyleActionSheet];
-        
+
         UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:cancelTitle style:UIAlertActionStyleCancel handler:^(UIAlertAction * action) {
             self.callback(@[@{@"didCancel": @YES}]); // Return callback for 'cancel' action (if is required)
         }];
         [self.alertController addAction:cancelAction];
-        
+
         if (![takePhotoButtonTitle isEqual:[NSNull null]] && takePhotoButtonTitle.length > 0) {
             UIAlertAction *takePhotoAction = [UIAlertAction actionWithTitle:takePhotoButtonTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction * action) {
                 [self actionHandler:action];
@@ -85,7 +90,7 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
             }];
             [self.alertController addAction:chooseFromLibraryAction];
         }
-        
+
         // Add custom buttons to action sheet
         if ([self.options objectForKey:@"customButtons"] && [[self.options objectForKey:@"customButtons"] isKindOfClass:[NSDictionary class]]) {
             self.customButtons = [self.options objectForKey:@"customButtons"];
@@ -96,19 +101,19 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
                 [self.alertController addAction:customAction];
             }
         }
-        
+
         dispatch_async(dispatch_get_main_queue(), ^{
             UIViewController *root = [[[[UIApplication sharedApplication] delegate] window] rootViewController];
             while (root.presentedViewController != nil) {
                 root = root.presentedViewController;
             }
-            
+
             /* On iPad, UIAlertController presents a popover view rather than an action sheet like on iPhone. We must provide the location
              of the location to show the popover in this case. For simplicity, we'll just display it on the bottom center of the screen
              to mimic an action sheet */
             self.alertController.popoverPresentationController.sourceView = root.view;
             self.alertController.popoverPresentationController.sourceRect = CGRectMake(root.view.bounds.size.width / 2.0, root.view.bounds.size.height, 1.0, 1.0);
-            
+
             if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
                 self.alertController.popoverPresentationController.permittedArrowDirections = 0;
                 for (id subview in self.alertController.view.subviews) {
@@ -117,20 +122,20 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
                     }
                 }
             }
-            
+
             [root presentViewController:self.alertController animated:YES completion:nil];
         });
     }
     else { // iOS 7 support
         UIActionSheet *popup = [[UIActionSheet alloc] initWithTitle:title delegate:self cancelButtonTitle:cancelTitle destructiveButtonTitle:nil otherButtonTitles:takePhotoButtonTitle, chooseFromLibraryButtonTitle, nil];
-        
+
         if ([self.options objectForKey:@"customButtons"] && [[self.options objectForKey:@"customButtons"] isKindOfClass:[NSDictionary class]]) {
             self.customButtons = [self.options objectForKey:@"customButtons"];
             for (NSString *key in self.customButtons) {
                 [popup addButtonWithTitle:key];
             }
         }
-        
+
         popup.tag = 1;
         dispatch_async(dispatch_get_main_queue(), ^{
             UIViewController *root = [[[[UIApplication sharedApplication] delegate] window] rootViewController];
@@ -173,7 +178,7 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
         self.callback(@[@{@"customButton": customButtonStr}]);
         return;
     }
-    
+
     if ([action.title isEqualToString:[self.options valueForKey:@"takePhotoButtonTitle"]]) { // Take photo
         [self launchImagePicker:RNImagePickerTargetCamera];
     }
@@ -194,7 +199,7 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
 - (void)launchImagePicker:(RNImagePickerTarget)target
 {
     self.picker = [[UIImagePickerController alloc] init];
-    
+
     if (target == RNImagePickerTargetCamera) {
 #if TARGET_IPHONE_SIMULATOR
         self.callback(@[@{@"error": @"Camera not available on simulator"}]);
@@ -212,52 +217,37 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
     else { // RNImagePickerTargetLibrarySingleImage
         self.picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
     }
-    [self addAttachment];
-    
-//    if ([[self.options objectForKey:@"mediaType"] isEqualToString:@"video"]) {
-//        self.picker.mediaTypes = @[(NSString *)kUTTypeMovie];
-//
-//        if ([[self.options objectForKey:@"videoQuality"] isEqualToString:@"high"]) {
-//            self.picker.videoQuality = UIImagePickerControllerQualityTypeHigh;
-//        }
-//        else if ([[self.options objectForKey:@"videoQuality"] isEqualToString:@"low"]) {
-//            self.picker.videoQuality = UIImagePickerControllerQualityTypeLow;
-//        }
-//        else {
-//            self.picker.videoQuality = UIImagePickerControllerQualityTypeMedium;
-//        }
-//    }
-//    else {
-//        self.picker.mediaTypes = @[(NSString *)kUTTypeImage];
-//    }
-//
-//    if ([[self.options objectForKey:@"allowsEditing"] boolValue]) {
-//        self.picker.allowsEditing = true;
-//    }
-//    self.picker.modalPresentationStyle = UIModalPresentationCurrentContext;
-//    self.picker.delegate = self;
-//
-//    dispatch_async(dispatch_get_main_queue(), ^{
-//        UIViewController *root = [[[[UIApplication sharedApplication] delegate] window] rootViewController];
-//        while (root.presentedViewController != nil) {
-//            root = root.presentedViewController;
-//        }
-//        [root presentViewController:self.picker animated:YES completion:nil];
-//    });
-}
 
-- (void)addAttachment {
-    // (1)
-    DBAttachmentPickerController *attachmentPickerController = [DBAttachmentPickerController attachmentPickerControllerFinishPickingBlock:^(NSArray<DBAttachment *> * _Nonnull attachmentArray) {...} cancelBlock:^{...}];
-    
-    // (2)
-    attachmentPickerController.mediaType = DBAttachmentMediaTypeImage | DBAttachmentMediaTypeVideo;
-    attachmentPickerController.capturedVideoQulity = UIImagePickerControllerQualityTypeHigh;
-    attachmentPickerController.allowsMultipleSelection = YES;
-    attachmentPickerController.allowsSelectionFromOtherApps = YES;
-    
-    // (3)
-    [attachmentPickerController presentOnViewController:self];
+    if ([[self.options objectForKey:@"mediaType"] isEqualToString:@"video"]) {
+        self.picker.mediaTypes = @[(NSString *)kUTTypeMovie];
+
+        if ([[self.options objectForKey:@"videoQuality"] isEqualToString:@"high"]) {
+            self.picker.videoQuality = UIImagePickerControllerQualityTypeHigh;
+        }
+        else if ([[self.options objectForKey:@"videoQuality"] isEqualToString:@"low"]) {
+            self.picker.videoQuality = UIImagePickerControllerQualityTypeLow;
+        }
+        else {
+            self.picker.videoQuality = UIImagePickerControllerQualityTypeMedium;
+        }
+    }
+    else {
+        self.picker.mediaTypes = @[(NSString *)kUTTypeImage];
+    }
+
+    if ([[self.options objectForKey:@"allowsEditing"] boolValue]) {
+        self.picker.allowsEditing = true;
+    }
+    self.picker.modalPresentationStyle = UIModalPresentationCurrentContext;
+    self.picker.delegate = self;
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIViewController *root = [[[[UIApplication sharedApplication] delegate] window] rootViewController];
+        while (root.presentedViewController != nil) {
+            root = root.presentedViewController;
+        }
+        [root presentViewController:self.picker animated:YES completion:nil];
+    });
 }
 
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary *)info
