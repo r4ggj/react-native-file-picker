@@ -1,9 +1,9 @@
 #import "FilePickerManager.h"
 #import "RCTConvert.h"
+#import "DBAttachmentPickerController/DBAttachmentPickerController.h"
 #import <AssetsLibrary/AssetsLibrary.h>
 
 @import MobileCoreServices;
-
 @interface FilePickerManager ()
 
 @property (nonatomic, strong) UIAlertController *alertController;
@@ -212,37 +212,52 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
     else { // RNImagePickerTargetLibrarySingleImage
         self.picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
     }
+    [self addAttachment];
     
-    if ([[self.options objectForKey:@"mediaType"] isEqualToString:@"video"]) {
-        self.picker.mediaTypes = @[(NSString *)kUTTypeMovie];
-        
-        if ([[self.options objectForKey:@"videoQuality"] isEqualToString:@"high"]) {
-            self.picker.videoQuality = UIImagePickerControllerQualityTypeHigh;
-        }
-        else if ([[self.options objectForKey:@"videoQuality"] isEqualToString:@"low"]) {
-            self.picker.videoQuality = UIImagePickerControllerQualityTypeLow;
-        }
-        else {
-            self.picker.videoQuality = UIImagePickerControllerQualityTypeMedium;
-        }
-    }
-    else {
-        self.picker.mediaTypes = @[(NSString *)kUTTypeImage];
-    }
+//    if ([[self.options objectForKey:@"mediaType"] isEqualToString:@"video"]) {
+//        self.picker.mediaTypes = @[(NSString *)kUTTypeMovie];
+//
+//        if ([[self.options objectForKey:@"videoQuality"] isEqualToString:@"high"]) {
+//            self.picker.videoQuality = UIImagePickerControllerQualityTypeHigh;
+//        }
+//        else if ([[self.options objectForKey:@"videoQuality"] isEqualToString:@"low"]) {
+//            self.picker.videoQuality = UIImagePickerControllerQualityTypeLow;
+//        }
+//        else {
+//            self.picker.videoQuality = UIImagePickerControllerQualityTypeMedium;
+//        }
+//    }
+//    else {
+//        self.picker.mediaTypes = @[(NSString *)kUTTypeImage];
+//    }
+//
+//    if ([[self.options objectForKey:@"allowsEditing"] boolValue]) {
+//        self.picker.allowsEditing = true;
+//    }
+//    self.picker.modalPresentationStyle = UIModalPresentationCurrentContext;
+//    self.picker.delegate = self;
+//
+//    dispatch_async(dispatch_get_main_queue(), ^{
+//        UIViewController *root = [[[[UIApplication sharedApplication] delegate] window] rootViewController];
+//        while (root.presentedViewController != nil) {
+//            root = root.presentedViewController;
+//        }
+//        [root presentViewController:self.picker animated:YES completion:nil];
+//    });
+}
+
+- (void)addAttachment {
+    // (1)
+    DBAttachmentPickerController *attachmentPickerController = [DBAttachmentPickerController attachmentPickerControllerFinishPickingBlock:^(NSArray<DBAttachment *> * _Nonnull attachmentArray) {...} cancelBlock:^{...}];
     
-    if ([[self.options objectForKey:@"allowsEditing"] boolValue]) {
-        self.picker.allowsEditing = true;
-    }
-    self.picker.modalPresentationStyle = UIModalPresentationCurrentContext;
-    self.picker.delegate = self;
+    // (2)
+    attachmentPickerController.mediaType = DBAttachmentMediaTypeImage | DBAttachmentMediaTypeVideo;
+    attachmentPickerController.capturedVideoQulity = UIImagePickerControllerQualityTypeHigh;
+    attachmentPickerController.allowsMultipleSelection = YES;
+    attachmentPickerController.allowsSelectionFromOtherApps = YES;
     
-    dispatch_async(dispatch_get_main_queue(), ^{
-        UIViewController *root = [[[[UIApplication sharedApplication] delegate] window] rootViewController];
-        while (root.presentedViewController != nil) {
-            root = root.presentedViewController;
-        }
-        [root presentViewController:self.picker animated:YES completion:nil];
-    });
+    // (3)
+    [attachmentPickerController presentOnViewController:self];
 }
 
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary *)info
